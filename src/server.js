@@ -12,21 +12,21 @@ const redisCache = new Redis();
 
 const io = new Server(httpServer, {
   cors: {
-    origin: "http://localhost:5500",
+    origin: "*",
     methods: ["GET", "POST"],
   },
 });
 
 io.on("connection", (socket) => {
   console.log("A user connected " + socket.id);
-  socket.on("setUserId", (userId) => {
-    console.log("Setting user id to connection id", userId, socket.id);
-    redisCache.set(userId, socket.id);
+  socket.on("setUserId", (userID) => {
+    console.log("Setting user id to connection id", userID, socket.id);
+    redisCache.set(userID, socket.id);
   });
 
-  socket.on("getConnectionId", async (userId) => {
-    const connId = await redisCache.get(userId);
-    console.log("Getting connection id for user id", userId, connId);
+  socket.on("getConnectionId", async (userID) => {
+    const connId = await redisCache.get(userID);
+    console.log("Getting connection id for user id", userID, connId);
     socket.emit("connectionId", connId);
     const everything = await redisCache.keys("*");
 
@@ -35,15 +35,20 @@ io.on("connection", (socket) => {
 });
 
 app.post("/sendPayload", async (req, res) => {
-  console.log(req.body);
-  const { userId, payload } = req.body;
-  if (!userId || !payload) {
+  console.log("here: ", req.body);
+  const { userID, payload } = req.body;
+  console.log("Sending payload to user", userID, payload);
+
+  if (!userID || !payload) {
     return res.status(400).send("Invalid request");
   }
-  const socketId = await redisCache.get(userId);
+  const socketId = await redisCache.get(userID);
+  console.log("socket id: ", socketId);
 
   if (socketId) {
     io.to(socketId).emit("submissionPayloadResponse", payload);
+    console.log("payload sent: ", payload);
+
     return res.send("Payload sent successfully");
   } else {
     return res.status(404).send("User not connected");
